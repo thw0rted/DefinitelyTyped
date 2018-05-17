@@ -558,21 +558,23 @@ declare namespace NodeJS {
     }
 
     export class EventEmitter {
+        /** @deprecated */ static listenerCount(emitter: EventEmitter, event: string | symbol): number;
+        static defaultMaxListeners: number;
+
         addListener(event: string | symbol, listener: (...args: any[]) => void): this;
+        emit(event: string | symbol, ...args: any[]): boolean;
+        eventNames(): Array<string | symbol>;
+        getMaxListeners(): number;
+        listenerCount(type: string | symbol): number;
+        listeners(event: string | symbol): Function[];
         on(event: string | symbol, listener: (...args: any[]) => void): this;
         once(event: string | symbol, listener: (...args: any[]) => void): this;
-        removeListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        removeAllListeners(event?: string | symbol): this;
-        setMaxListeners(n: number): this;
-        getMaxListeners(): number;
-        listeners(event: string | symbol): Function[];
-        rawListeners(event: string | symbol): Function[];
-        emit(event: string | symbol, ...args: any[]): boolean;
-        listenerCount(type: string | symbol): number;
-        // Added in Node 6...
         prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
         prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        eventNames(): Array<string | symbol>;
+        rawListeners(event: string | symbol): Function[];
+        removeAllListeners(event?: string | symbol): this;
+        removeListener(event: string | symbol, listener: (...args: any[]) => void): this;
+        setMaxListeners(n: number): this;
     }
 
     export interface ReadableStream extends EventEmitter {
@@ -701,6 +703,7 @@ declare namespace NodeJS {
         destroy(error?: Error): void;
     }
 
+    // TODO: use TypedEventEmitterBase?
     export interface Process extends EventEmitter {
         stdout: WriteStream;
         stderr: WriteStream;
@@ -1004,24 +1007,24 @@ declare module "events" {
     class internal extends NodeJS.EventEmitter { }
 
     namespace internal {
-        export class EventEmitter extends internal {
-            static listenerCount(emitter: EventEmitter, event: string | symbol): number; // deprecated
-            static defaultMaxListeners: number;
+        export class EventEmitter extends internal { }
 
-            addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-            on(event: string | symbol, listener: (...args: any[]) => void): this;
-            once(event: string | symbol, listener: (...args: any[]) => void): this;
-            prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-            prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-            removeListener(event: string | symbol, listener: (...args: any[]) => void): this;
-            removeAllListeners(event?: string | symbol): this;
-            setMaxListeners(n: number): this;
-            getMaxListeners(): number;
-            listeners(event: string | symbol): Function[];
-            rawListeners(event: string | symbol): Function[];
-            emit(event: string | symbol, ...args: any[]): boolean;
-            eventNames(): Array<string | symbol>;
-            listenerCount(type: string | symbol): number;
+        // Merged with constructor objects
+        export interface EventEmitterStatic {
+            /** @deprecated */ listenerCount(emitter: NodeJS.EventEmitter, event: string | symbol): number;
+            defaultMaxListeners: number;
+        }
+
+        // Pass an interface as the generic type parameter that looks like
+        // { eventName: (cbArg: argType, ...) => void }
+        export class TypedEventEmitterBase<T> {
+            addListener: OnAll<T, this>;
+            on: OnAll<T, this>;
+            once: OnAll<T, this>;
+            prependListener: OnAll<T, this>;
+            prependOnceListener: OnAll<T, this>;
+            removeListener: OnAll<T, this>;
+            emit: EmitAll<T>;
         }
     }
 
@@ -1105,66 +1108,27 @@ declare module "http" {
         createConnection?: (options: ClientRequestArgs, oncreate: (err: Error, socket: net.Socket) => void) => net.Socket;
     }
 
-    export class Server extends net.Server {
-        constructor(requestListener?: (req: IncomingMessage, res: ServerResponse) => void);
-
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface ServerEvents extends net.ServerEvents {
+        checkContinue: (request: IncomingMessage, response: ServerResponse) => void;
+        checkExpectation: (request: IncomingMessage, response: ServerResponse) => void;
+        clientError: (exception: Error, socket: net.Socket) => void;
+        connect: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void;
+        request: (request: IncomingMessage, response: ServerResponse) => void;
+        upgrade: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void;
+    }
+    class ServerImpl extends events.TypedEventEmitterBase<ServerEvents> {
         setTimeout(msecs?: number, callback?: () => void): this;
         setTimeout(callback: () => void): this;
         maxHeadersCount: number;
         timeout: number;
         keepAliveTimeout: number;
-
-        /**
-         * http.Server events
-         * 1. checkContinue
-         * 2. checkExpectation
-         * 3. clientError
-         * 4. connect
-         * 5. request
-         * 6. upgrade
-         **/
-        // addListener(event: "checkContinue", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // addListener(event: "checkExpectation", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // addListener(event: "clientError", listener: (exception: Error, socket: net.Socket) => void): this;
-        // addListener(event: "connect", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-        // addListener(event: "request", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // addListener(event: "upgrade", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-
-        // emit(event: "checkContinue", request: IncomingMessage, response: ServerResponse): boolean;
-        // emit(event: "checkExpectation", request: IncomingMessage, response: ServerResponse): boolean;
-        // emit(event: "clientError", exception: Error, socket: net.Socket): boolean;
-        // emit(event: "connect", request: IncomingMessage, socket: net.Socket, head: Buffer): boolean;
-        // emit(event: "request", request: IncomingMessage, response: ServerResponse): boolean;
-        // emit(event: "upgrade", request: IncomingMessage, socket: net.Socket, head: Buffer): boolean;
-
-        // on(event: "checkContinue", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // on(event: "checkExpectation", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // on(event: "clientError", listener: (exception: Error, socket: net.Socket) => void): this;
-        // on(event: "connect", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-        // on(event: "request", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // on(event: "upgrade", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-
-        // once(event: "checkContinue", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // once(event: "checkExpectation", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // once(event: "clientError", listener: (exception: Error, socket: net.Socket) => void): this;
-        // once(event: "connect", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-        // once(event: "request", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // once(event: "upgrade", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-
-        // prependListener(event: "checkContinue", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // prependListener(event: "checkExpectation", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // prependListener(event: "clientError", listener: (exception: Error, socket: net.Socket) => void): this;
-        // prependListener(event: "connect", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-        // prependListener(event: "request", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // prependListener(event: "upgrade", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-
-        // prependOnceListener(event: "checkContinue", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // prependOnceListener(event: "checkExpectation", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // prependOnceListener(event: "clientError", listener: (exception: Error, socket: net.Socket) => void): this;
-        // prependOnceListener(event: "connect", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
-        // prependOnceListener(event: "request", listener: (request: IncomingMessage, response: ServerResponse) => void): this;
-        // prependOnceListener(event: "upgrade", listener: (request: IncomingMessage, socket: net.Socket, head: Buffer) => void): this;
     }
+    export type Server = ServerImpl & net.Server;
+    export const Server: {
+        new(requestListener?: (req: IncomingMessage, res: ServerResponse) => void): Server,
+    } & events.EventEmitterStatic;
+
     /**
      * @deprecated Use IncomingMessage
      */
@@ -1342,7 +1306,16 @@ declare module "cluster" {
         addressType: number | "udp4" | "udp6";  // 4, 6, -1, "udp4", "udp6"
     }
 
-    export class Worker extends events.EventEmitter {
+    export interface WorkerEvents {
+        disconnect: () => void;
+        error: (error: Error) => void;
+        exit: (code: number, signal: string) => void;
+        listening: (address: Address) => void;
+        message: (message: any, handle: net.Socket | net.Server | undefined) => void;
+        online: () => void;
+    }
+
+    class WorkerImpl extends events.TypedEventEmitterBase<WorkerEvents> {
         id: number;
         process: child.ChildProcess;
         suicide: boolean;
@@ -1353,60 +1326,25 @@ declare module "cluster" {
         isConnected(): boolean;
         isDead(): boolean;
         exitedAfterDisconnect: boolean;
-
-        /**
-         * events.EventEmitter
-         *   1. disconnect
-         *   2. error
-         *   3. exit
-         *   4. listening
-         *   5. message
-         *   6. online
-         */
-        addListener(event: "disconnect", listener: () => void): this;
-        addListener(event: "error", listener: (error: Error) => void): this;
-        addListener(event: "exit", listener: (code: number, signal: string) => void): this;
-        addListener(event: "listening", listener: (address: Address) => void): this;
-        addListener(event: "message", listener: (message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        addListener(event: "online", listener: () => void): this;
-
-        emit(event: "disconnect"): boolean;
-        emit(event: "error", error: Error): boolean;
-        emit(event: "exit", code: number, signal: string): boolean;
-        emit(event: "listening", address: Address): boolean;
-        emit(event: "message", message: any, handle: net.Socket | net.Server): boolean;
-        emit(event: "online"): boolean;
-
-        on(event: "disconnect", listener: () => void): this;
-        on(event: "error", listener: (error: Error) => void): this;
-        on(event: "exit", listener: (code: number, signal: string) => void): this;
-        on(event: "listening", listener: (address: Address) => void): this;
-        on(event: "message", listener: (message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        on(event: "online", listener: () => void): this;
-
-        once(event: "disconnect", listener: () => void): this;
-        once(event: "error", listener: (error: Error) => void): this;
-        once(event: "exit", listener: (code: number, signal: string) => void): this;
-        once(event: "listening", listener: (address: Address) => void): this;
-        once(event: "message", listener: (message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        once(event: "online", listener: () => void): this;
-
-        prependListener(event: "disconnect", listener: () => void): this;
-        prependListener(event: "error", listener: (error: Error) => void): this;
-        prependListener(event: "exit", listener: (code: number, signal: string) => void): this;
-        prependListener(event: "listening", listener: (address: Address) => void): this;
-        prependListener(event: "message", listener: (message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        prependListener(event: "online", listener: () => void): this;
-
-        prependOnceListener(event: "disconnect", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (error: Error) => void): this;
-        prependOnceListener(event: "exit", listener: (code: number, signal: string) => void): this;
-        prependOnceListener(event: "listening", listener: (address: Address) => void): this;
-        prependOnceListener(event: "message", listener: (message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        prependOnceListener(event: "online", listener: () => void): this;
     }
 
-    export interface Cluster extends events.EventEmitter {
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Worker = WorkerImpl & events.EventEmitter;
+    export const Worker: {
+        new(): Worker,
+    } & events.EventEmitterStatic;
+
+    export interface ClusterEvents {
+        disconnect: (worker: Worker) => void;
+        exit: (worker: Worker, code: number, signal: string) => void;
+        fork: (worker: Worker) => void;
+        listening: (worker: Worker, address: Address) => void;
+        message: (worker: Worker, message: any, handle: net.Socket | net.Server | undefined) => void;
+        online: (worker: Worker) => void;
+        setup: (settings: any) => void;
+    }
+
+    export interface ClusterImpl extends events.TypedEventEmitterBase<ClusterEvents> {
         Worker: Worker;
         disconnect(callback?: Function): void;
         fork(env?: any): Worker;
@@ -1419,66 +1357,17 @@ declare module "cluster" {
         workers?: {
             [index: string]: Worker | undefined
         };
-
-        /**
-         * events.EventEmitter
-         *   1. disconnect
-         *   2. exit
-         *   3. fork
-         *   4. listening
-         *   5. message
-         *   6. online
-         *   7. setup
-         */
-        addListener(event: "disconnect", listener: (worker: Worker) => void): this;
-        addListener(event: "exit", listener: (worker: Worker, code: number, signal: string) => void): this;
-        addListener(event: "fork", listener: (worker: Worker) => void): this;
-        addListener(event: "listening", listener: (worker: Worker, address: Address) => void): this;
-        addListener(event: "message", listener: (worker: Worker, message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        addListener(event: "online", listener: (worker: Worker) => void): this;
-        addListener(event: "setup", listener: (settings: any) => void): this;
-
-        emit(event: "disconnect", worker: Worker): boolean;
-        emit(event: "exit", worker: Worker, code: number, signal: string): boolean;
-        emit(event: "fork", worker: Worker): boolean;
-        emit(event: "listening", worker: Worker, address: Address): boolean;
-        emit(event: "message", worker: Worker, message: any, handle: net.Socket | net.Server): boolean;
-        emit(event: "online", worker: Worker): boolean;
-        emit(event: "setup", settings: any): boolean;
-
-        on(event: "disconnect", listener: (worker: Worker) => void): this;
-        on(event: "exit", listener: (worker: Worker, code: number, signal: string) => void): this;
-        on(event: "fork", listener: (worker: Worker) => void): this;
-        on(event: "listening", listener: (worker: Worker, address: Address) => void): this;
-        on(event: "message", listener: (worker: Worker, message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        on(event: "online", listener: (worker: Worker) => void): this;
-        on(event: "setup", listener: (settings: any) => void): this;
-
-        once(event: "disconnect", listener: (worker: Worker) => void): this;
-        once(event: "exit", listener: (worker: Worker, code: number, signal: string) => void): this;
-        once(event: "fork", listener: (worker: Worker) => void): this;
-        once(event: "listening", listener: (worker: Worker, address: Address) => void): this;
-        once(event: "message", listener: (worker: Worker, message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        once(event: "online", listener: (worker: Worker) => void): this;
-        once(event: "setup", listener: (settings: any) => void): this;
-
-        prependListener(event: "disconnect", listener: (worker: Worker) => void): this;
-        prependListener(event: "exit", listener: (worker: Worker, code: number, signal: string) => void): this;
-        prependListener(event: "fork", listener: (worker: Worker) => void): this;
-        prependListener(event: "listening", listener: (worker: Worker, address: Address) => void): this;
-        prependListener(event: "message", listener: (worker: Worker, message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        prependListener(event: "online", listener: (worker: Worker) => void): this;
-        prependListener(event: "setup", listener: (settings: any) => void): this;
-
-        prependOnceListener(event: "disconnect", listener: (worker: Worker) => void): this;
-        prependOnceListener(event: "exit", listener: (worker: Worker, code: number, signal: string) => void): this;
-        prependOnceListener(event: "fork", listener: (worker: Worker) => void): this;
-        prependOnceListener(event: "listening", listener: (worker: Worker, address: Address) => void): this;
-        prependOnceListener(event: "message", listener: (worker: Worker, message: any, handle: net.Socket | net.Server) => void): this;  // the handle is a net.Socket or net.Server object, or undefined.
-        prependOnceListener(event: "online", listener: (worker: Worker) => void): this;
-        prependOnceListener(event: "setup", listener: (settings: any) => void): this;
     }
 
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Cluster = ClusterImpl & events.EventEmitter;
+    export const Cluster: {
+        new(): Cluster,
+    } & events.EventEmitterStatic;
+
+    // TODO: don't re-declare the whole Cluster class, just export an instance
+    // of the one we have above at module level so e.g. `require("cluster").isMaster` works.
+    // Then, I think we can get rid of everything from here til the end of the module.
     export function disconnect(callback?: Function): void;
     export function fork(env?: any): Worker;
     export var isMaster: boolean;
@@ -1923,8 +1812,9 @@ declare module "punycode" {
 }
 
 declare module "repl" {
-    import * as stream from "stream";
+    import * as events from "events";
     import * as readline from "readline";
+    import * as stream from "stream";
 
     export interface ReplOptions {
         prompt?: string;
@@ -1941,44 +1831,25 @@ declare module "repl" {
         breakEvalOnSigint?: any;
     }
 
-    export interface REPLServer extends readline.ReadLine {
+    export interface ReplEvents {
+        exit: () => void;
+        reset: (context: any) => void;
+    }
+
+    export interface REPLServerImpl extends events.TypedEventEmitterBase<ReplEvents> {
         context: any;
         inputStream: NodeJS.ReadableStream;
         outputStream: NodeJS.WritableStream;
 
         defineCommand(keyword: string, cmd: Function | { help: string, action: Function }): void;
         displayPrompt(preserveCursor?: boolean): void;
-
-        /**
-         * events.EventEmitter
-         * 1. exit
-         * 2. reset
-         */
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "exit", listener: () => void): this;
-        addListener(event: "reset", listener: (...args: any[]) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "exit"): boolean;
-        emit(event: "reset", context: any): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "exit", listener: () => void): this;
-        on(event: "reset", listener: (...args: any[]) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "exit", listener: () => void): this;
-        once(event: "reset", listener: (...args: any[]) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "exit", listener: () => void): this;
-        prependListener(event: "reset", listener: (...args: any[]) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "exit", listener: () => void): this;
-        prependOnceListener(event: "reset", listener: (...args: any[]) => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type REPLServer = REPLServerImpl & readline.ReadLine;
+    export const REPLServer: {
+        new(): REPLServer,
+    } & events.EventEmitterStatic;
 
     export function start(options?: string | ReplOptions): REPLServer;
 
@@ -2001,7 +1872,17 @@ declare module "readline" {
         shift?: boolean;
     }
 
-    export interface ReadLine extends events.EventEmitter {
+    export interface ReadLineEvents {
+        close: () => void;
+        line: (input: any) => void;
+        pause: () => void;
+        resume: () => void;
+        SIGCONT: () => void;
+        SIGINT: () => void;
+        SIGTSTP: () => void;
+    }
+
+    export interface ReadLineImpl extends events.TypedEventEmitterBase<ReadLineEvents> {
         setPrompt(prompt: string): void;
         prompt(preserveCursor?: boolean): void;
         question(query: string, callback: (answer: string) => void): void;
@@ -2009,72 +1890,13 @@ declare module "readline" {
         resume(): ReadLine;
         close(): void;
         write(data: string | Buffer, key?: Key): void;
-
-        /**
-         * events.EventEmitter
-         * 1. close
-         * 2. line
-         * 3. pause
-         * 4. resume
-         * 5. SIGCONT
-         * 6. SIGINT
-         * 7. SIGTSTP
-         */
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "close", listener: () => void): this;
-        addListener(event: "line", listener: (input: any) => void): this;
-        addListener(event: "pause", listener: () => void): this;
-        addListener(event: "resume", listener: () => void): this;
-        addListener(event: "SIGCONT", listener: () => void): this;
-        addListener(event: "SIGINT", listener: () => void): this;
-        addListener(event: "SIGTSTP", listener: () => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "close"): boolean;
-        emit(event: "line", input: any): boolean;
-        emit(event: "pause"): boolean;
-        emit(event: "resume"): boolean;
-        emit(event: "SIGCONT"): boolean;
-        emit(event: "SIGINT"): boolean;
-        emit(event: "SIGTSTP"): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "close", listener: () => void): this;
-        on(event: "line", listener: (input: any) => void): this;
-        on(event: "pause", listener: () => void): this;
-        on(event: "resume", listener: () => void): this;
-        on(event: "SIGCONT", listener: () => void): this;
-        on(event: "SIGINT", listener: () => void): this;
-        on(event: "SIGTSTP", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "close", listener: () => void): this;
-        once(event: "line", listener: (input: any) => void): this;
-        once(event: "pause", listener: () => void): this;
-        once(event: "resume", listener: () => void): this;
-        once(event: "SIGCONT", listener: () => void): this;
-        once(event: "SIGINT", listener: () => void): this;
-        once(event: "SIGTSTP", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "close", listener: () => void): this;
-        prependListener(event: "line", listener: (input: any) => void): this;
-        prependListener(event: "pause", listener: () => void): this;
-        prependListener(event: "resume", listener: () => void): this;
-        prependListener(event: "SIGCONT", listener: () => void): this;
-        prependListener(event: "SIGINT", listener: () => void): this;
-        prependListener(event: "SIGTSTP", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
-        prependOnceListener(event: "line", listener: (input: any) => void): this;
-        prependOnceListener(event: "pause", listener: () => void): this;
-        prependOnceListener(event: "resume", listener: () => void): this;
-        prependOnceListener(event: "SIGCONT", listener: () => void): this;
-        prependOnceListener(event: "SIGINT", listener: () => void): this;
-        prependOnceListener(event: "SIGTSTP", listener: () => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type ReadLine = ReadLineImpl & events.EventEmitter;
+    export const ReadLine: {
+        new(): ReadLine,
+    } & events.EventEmitterStatic;
 
     type Completer = (line: string) => CompleterResult;
     type AsyncCompleter = (line: string, callback: (err: any, result: CompleterResult) => void) => any;
@@ -2137,7 +1959,15 @@ declare module "child_process" {
     import * as stream from "stream";
     import * as net from "net";
 
-    export interface ChildProcess extends events.EventEmitter {
+    interface ChildProcessEvents {
+        close: (code: number, signal: string) => void;
+        disconnect: () => void;
+        error: (err: Error) => void;
+        exit: (code: number, signal: string) => void;
+        message: (message: any, sendHandle: net.Socket | net.Server) => void;
+    }
+
+    export interface ChildProcessImpl extends events.TypedEventEmitterBase<ChildProcessEvents> {
         stdin: stream.Writable;
         stdout: stream.Readable;
         stderr: stream.Readable;
@@ -2152,58 +1982,13 @@ declare module "child_process" {
         disconnect(): void;
         unref(): void;
         ref(): void;
-
-        /**
-         * events.EventEmitter
-         * 1. close
-         * 2. disconnect
-         * 3. error
-         * 4. exit
-         * 5. message
-         */
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "close", listener: (code: number, signal: string) => void): this;
-        addListener(event: "disconnect", listener: () => void): this;
-        addListener(event: "error", listener: (err: Error) => void): this;
-        addListener(event: "exit", listener: (code: number, signal: string) => void): this;
-        addListener(event: "message", listener: (message: any, sendHandle: net.Socket | net.Server) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "close", code: number, signal: string): boolean;
-        emit(event: "disconnect"): boolean;
-        emit(event: "error", err: Error): boolean;
-        emit(event: "exit", code: number, signal: string): boolean;
-        emit(event: "message", message: any, sendHandle: net.Socket | net.Server): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "close", listener: (code: number, signal: string) => void): this;
-        on(event: "disconnect", listener: () => void): this;
-        on(event: "error", listener: (err: Error) => void): this;
-        on(event: "exit", listener: (code: number, signal: string) => void): this;
-        on(event: "message", listener: (message: any, sendHandle: net.Socket | net.Server) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "close", listener: (code: number, signal: string) => void): this;
-        once(event: "disconnect", listener: () => void): this;
-        once(event: "error", listener: (err: Error) => void): this;
-        once(event: "exit", listener: (code: number, signal: string) => void): this;
-        once(event: "message", listener: (message: any, sendHandle: net.Socket | net.Server) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "close", listener: (code: number, signal: string) => void): this;
-        prependListener(event: "disconnect", listener: () => void): this;
-        prependListener(event: "error", listener: (err: Error) => void): this;
-        prependListener(event: "exit", listener: (code: number, signal: string) => void): this;
-        prependListener(event: "message", listener: (message: any, sendHandle: net.Socket | net.Server) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "close", listener: (code: number, signal: string) => void): this;
-        prependOnceListener(event: "disconnect", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (err: Error) => void): this;
-        prependOnceListener(event: "exit", listener: (code: number, signal: string) => void): this;
-        prependOnceListener(event: "message", listener: (message: any, sendHandle: net.Socket | net.Server) => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type ChildProcess = ChildProcessImpl & events.EventEmitter;
+    export const ChildProcess: {
+        new(): ChildProcess,
+    } & events.EventEmitterStatic;
 
     export interface MessageOptions {
         keepOpen?: boolean;
@@ -2729,9 +2514,19 @@ declare module "net" {
 
     export type SocketConnectOpts = TcpSocketConnectOpts | IpcSocketConnectOpts;
 
-    export class Socket extends stream.Duplex {
-        constructor(options?: SocketConstructorOpts);
+    export interface SocketEvents {
+        close: (had_error: boolean) => void;
+        connect: () => void;
+        data: (data: Buffer) => void;
+        drain: () => void;
+        end: () => void;
+        error: (err: Error) => void;
+        lookup: (err: Error, address: string, family: string | number, host: string) => void;
+        readable: () => void;
+        timeout: () => void;
+    }
 
+    export class SocketImpl extends events.TypedEventEmitterBase<SocketEvents> {
         // Extended base methods
         write(buffer: Buffer): boolean;
         write(buffer: Buffer, cb?: Function): boolean;
@@ -2773,78 +2568,13 @@ declare module "net" {
         end(str: string, cb?: Function): void;
         end(str: string, encoding?: string, cb?: Function): void;
         end(data?: any, encoding?: string): void;
-
-        /**
-         * events.EventEmitter
-         *   1. close
-         *   2. connect
-         *   3. data
-         *   4. drain
-         *   5. end
-         *   6. error
-         *   7. lookup
-         *   8. timeout
-         */
-        addListener(event: "close", listener: (had_error: boolean) => void): this;
-        addListener(event: "connect", listener: () => void): this;
-        addListener(event: "data", listener: (data: Buffer) => void): this;
-        addListener(event: "drain", listener: () => void): this;
-        addListener(event: "end", listener: () => void): this;
-        addListener(event: "error", listener: (err: Error) => void): this;
-        addListener(event: "lookup", listener: (err: Error, address: string, family: string | number, host: string) => void): this;
-        addListener(event: "readable", listener: () => void): this;
-        addListener(event: "timeout", listener: () => void): this;
-
-        emit(event: "close", had_error?: boolean): boolean;
-        emit(event: "connect"): boolean;
-        emit(event: "data", data: Buffer): boolean;
-        emit(event: "drain"): boolean;
-        emit(event: "end"): boolean;
-        emit(event: "error", err: Error): boolean;
-        emit(event: "lookup", err: Error, address: string, family: string | number, host: string): boolean;
-        emit(event: "readable"): boolean;
-        emit(event: "timeout"): boolean;
-
-        on(event: "close", listener: (had_error: boolean) => void): this;
-        on(event: "connect", listener: () => void): this;
-        on(event: "data", listener: (data: Buffer) => void): this;
-        on(event: "drain", listener: () => void): this;
-        on(event: "end", listener: () => void): this;
-        on(event: "error", listener: (err: Error) => void): this;
-        on(event: "lookup", listener: (err: Error, address: string, family: string | number, host: string) => void): this;
-        on(event: "readable", listener: () => void): this;
-        on(event: "timeout", listener: () => void): this;
-
-        once(event: "close", listener: (had_error: boolean) => void): this;
-        once(event: "connect", listener: () => void): this;
-        once(event: "data", listener: (data: Buffer) => void): this;
-        once(event: "drain", listener: () => void): this;
-        once(event: "end", listener: () => void): this;
-        once(event: "error", listener: (err: Error) => void): this;
-        once(event: "lookup", listener: (err: Error, address: string, family: string | number, host: string) => void): this;
-        once(event: "readable", listener: () => void): this;
-        once(event: "timeout", listener: () => void): this;
-
-        prependListener(event: "close", listener: (had_error: boolean) => void): this;
-        prependListener(event: "connect", listener: () => void): this;
-        prependListener(event: "data", listener: (data: Buffer) => void): this;
-        prependListener(event: "drain", listener: () => void): this;
-        prependListener(event: "end", listener: () => void): this;
-        prependListener(event: "error", listener: (err: Error) => void): this;
-        prependListener(event: "lookup", listener: (err: Error, address: string, family: string | number, host: string) => void): this;
-        prependListener(event: "readable", listener: () => void): this;
-        prependListener(event: "timeout", listener: () => void): this;
-
-        prependOnceListener(event: "close", listener: (had_error: boolean) => void): this;
-        prependOnceListener(event: "connect", listener: () => void): this;
-        prependOnceListener(event: "data", listener: (data: Buffer) => void): this;
-        prependOnceListener(event: "drain", listener: () => void): this;
-        prependOnceListener(event: "end", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (err: Error) => void): this;
-        prependOnceListener(event: "lookup", listener: (err: Error, address: string, family: string | number, host: string) => void): this;
-        prependOnceListener(event: "readable", listener: () => void): this;
-        prependOnceListener(event: "timeout", listener: () => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Socket = SocketImpl & stream.Duplex;
+    export const Socket: {
+        new(options?: SocketConstructorOpts): Socket,
+    } & events.EventEmitterStatic;
 
     export interface ListenOptions {
         port?: number;
@@ -2854,15 +2584,14 @@ declare module "net" {
         exclusive?: boolean;
     }
 
-    interface ServerEvents {
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface ServerEvents {
         close: () => void;
         connection: (socket: Socket) => void;
         error: (err: Error) => void;
         listening: () => void;
     }
-
-    // https://github.com/nodejs/node/blob/master/lib/net.js
-    export class ServerImpl {
+    export class ServerImpl extends events.TypedEventEmitterBase<ServerEvents> {
         listen(port?: number, hostname?: string, backlog?: number, listeningListener?: Function): this;
         listen(port?: number, hostname?: string, listeningListener?: Function): this;
         listen(port?: number, backlog?: number, listeningListener?: Function): this;
@@ -2880,29 +2609,12 @@ declare module "net" {
         maxConnections: number;
         connections: number;
         listening: boolean;
-
-        /**
-         * events.EventEmitter
-         *   1. close
-         *   2. connection
-         *   3. error
-         *   4. listening
-         */
-        addListener: OnAll<ServerEvents>;
-        on: OnAll<ServerEvents>;
-        once: OnAll<ServerEvents>;
-        prependListener: OnAll<ServerEvents>;
-        prependOnceListener: OnAll<ServerEvents>;
-        emit: EmitAll<ServerEvents>;
     }
-
-    // Need a type in the type namespace, plus a constructor in the value namespace
     export type Server = ServerImpl & events.EventEmitter;
     export const Server: {
         new(connectionListener?: (socket: Socket) => void): Server,
         new(options?: { allowHalfOpen?: boolean, pauseOnConnect?: boolean }, connectionListener?: (socket: Socket) => void): Server,
-    };
-
+    } & events.EventEmitterStatic;
 
     export interface TcpNetConnectOpts extends TcpSocketConnectOpts, SocketConstructorOpts {
         timeout?: number;
@@ -2962,7 +2674,14 @@ declare module "dgram" {
     export function createSocket(type: SocketType, callback?: (msg: Buffer, rinfo: RemoteInfo) => void): Socket;
     export function createSocket(options: SocketOptions, callback?: (msg: Buffer, rinfo: RemoteInfo) => void): Socket;
 
-    export class Socket extends events.EventEmitter {
+    export interface SocketEvents {
+        close: () => void;
+        error: (err: Error) => void;
+        listening: () => void;
+        message: (msg: Buffer, rinfo: AddressInfo) => void;
+    }
+
+    export class SocketImpl extends events.TypedEventEmitterBase<SocketEvents> {
         send(msg: Buffer | String | any[], port: number, address: string, callback?: (error: Error | null, bytes: number) => void): void;
         send(msg: Buffer | String | any[], offset: number, length: number, port: number, address: string, callback?: (error: Error | null, bytes: number) => void): void;
         bind(port?: number, address?: string, callback?: () => void): void;
@@ -2984,50 +2703,13 @@ declare module "dgram" {
         setSendBufferSize(size: number): void;
         getRecvBufferSize(): number;
         getSendBufferSize(): number;
-
-        /**
-         * events.EventEmitter
-         * 1. close
-         * 2. error
-         * 3. listening
-         * 4. message
-         */
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "close", listener: () => void): this;
-        addListener(event: "error", listener: (err: Error) => void): this;
-        addListener(event: "listening", listener: () => void): this;
-        addListener(event: "message", listener: (msg: Buffer, rinfo: AddressInfo) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "close"): boolean;
-        emit(event: "error", err: Error): boolean;
-        emit(event: "listening"): boolean;
-        emit(event: "message", msg: Buffer, rinfo: AddressInfo): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "close", listener: () => void): this;
-        on(event: "error", listener: (err: Error) => void): this;
-        on(event: "listening", listener: () => void): this;
-        on(event: "message", listener: (msg: Buffer, rinfo: AddressInfo) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "close", listener: () => void): this;
-        once(event: "error", listener: (err: Error) => void): this;
-        once(event: "listening", listener: () => void): this;
-        once(event: "message", listener: (msg: Buffer, rinfo: AddressInfo) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "close", listener: () => void): this;
-        prependListener(event: "error", listener: (err: Error) => void): this;
-        prependListener(event: "listening", listener: () => void): this;
-        prependListener(event: "message", listener: (msg: Buffer, rinfo: AddressInfo) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (err: Error) => void): this;
-        prependOnceListener(event: "listening", listener: () => void): this;
-        prependOnceListener(event: "message", listener: (msg: Buffer, rinfo: AddressInfo) => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Socket = SocketImpl & events.EventEmitter;
+    export const Socket: {
+        new(): Socket,
+    } & events.EventEmitterStatic;
 }
 
 declare module "fs" {
@@ -3068,97 +2750,49 @@ declare module "fs" {
         birthtime: Date;
     }
 
-    export interface FSWatcher extends events.EventEmitter {
-        close(): void;
-
-        /**
-         * events.EventEmitter
-         *   1. change
-         *   2. error
-         */
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "change", listener: (eventType: string, filename: string | Buffer) => void): this;
-        addListener(event: "error", listener: (error: Error) => void): this;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "change", listener: (eventType: string, filename: string | Buffer) => void): this;
-        on(event: "error", listener: (error: Error) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "change", listener: (eventType: string, filename: string | Buffer) => void): this;
-        once(event: "error", listener: (error: Error) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "change", listener: (eventType: string, filename: string | Buffer) => void): this;
-        prependListener(event: "error", listener: (error: Error) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "change", listener: (eventType: string, filename: string | Buffer) => void): this;
-        prependOnceListener(event: "error", listener: (error: Error) => void): this;
+    export interface FSWatcherEvents {
+        change: (eventType: string, filename: string | Buffer) => void;
+        error: (error: Error) => void;
     }
 
-    export class ReadStream extends stream.Readable {
+    export interface FSWatcherImpl extends events.TypedEventEmitterBase<FSWatcherEvents> {
+        close(): void;
+    }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type FSWatcher = FSWatcherImpl & events.EventEmitter;
+    export const FSWatcher: {
+        new(): FSWatcher,
+    } & events.EventEmitterStatic;
+
+    export interface OpenEvent {
+        open: (fd: number) => void;
+    }
+
+    export class ReadStreamImpl extends events.TypedEventEmitterBase<stream.ReadableEvents & OpenEvent> {
         close(): void;
         destroy(): void;
         bytesRead: number;
         path: string | Buffer;
-
-        /**
-         * events.EventEmitter
-         *   1. open
-         *   2. close
-         */
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "open", listener: (fd: number) => void): this;
-        addListener(event: "close", listener: () => void): this;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "open", listener: (fd: number) => void): this;
-        on(event: "close", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "open", listener: (fd: number) => void): this;
-        once(event: "close", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "open", listener: (fd: number) => void): this;
-        prependListener(event: "close", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "open", listener: (fd: number) => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
     }
 
-    export class WriteStream extends stream.Writable {
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type ReadStream = ReadStreamImpl & stream.Readable;
+    export const ReadStream: {
+        new(): ReadStream,
+    } & events.EventEmitterStatic;
+
+    export class WriteStreamImpl extends events.TypedEventEmitterBase<stream.WritableEvents & OpenEvent> {
         close(): void;
         bytesWritten: number;
         path: string | Buffer;
-
-        /**
-         * events.EventEmitter
-         *   1. open
-         *   2. close
-         */
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "open", listener: (fd: number) => void): this;
-        addListener(event: "close", listener: () => void): this;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "open", listener: (fd: number) => void): this;
-        on(event: "close", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "open", listener: (fd: number) => void): this;
-        once(event: "close", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "open", listener: (fd: number) => void): this;
-        prependListener(event: "close", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "open", listener: (fd: number) => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type WriteStream = WriteStreamImpl & stream.Writable;
+    export const WriteStream: {
+        new(): WriteStream,
+    } & events.EventEmitterStatic;
 
     /**
      * Asynchronous rename(2) - Change the name or location of a file or directory.
@@ -5330,6 +4964,7 @@ declare module "string_decoder" {
 declare module "tls" {
     import * as crypto from "crypto";
     import * as dns from "dns";
+    import * as events from "events";
     import * as net from "net";
     import * as stream from "stream";
 
@@ -5393,71 +5028,74 @@ declare module "tls" {
         version: string;
     }
 
-    export class TLSSocket extends net.Socket {
+    export interface TLSSocketOptions {
         /**
-         * Construct a new tls.TLSSocket object from an existing TCP socket.
+         * An optional TLS context object from tls.createSecureContext()
          */
-        constructor(socket: net.Socket, options?: {
-            /**
-             * An optional TLS context object from tls.createSecureContext()
-             */
-            secureContext?: SecureContext,
-            /**
-             * If true the TLS socket will be instantiated in server-mode.
-             * Defaults to false.
-             */
-            isServer?: boolean,
-            /**
-             * An optional net.Server instance.
-             */
-            server?: net.Server,
-            /**
-             * If true the server will request a certificate from clients that
-             * connect and attempt to verify that certificate. Defaults to
-             * false.
-             */
-            requestCert?: boolean,
-            /**
-             * If true the server will reject any connection which is not
-             * authorized with the list of supplied CAs. This option only has an
-             * effect if requestCert is true. Defaults to false.
-             */
-            rejectUnauthorized?: boolean,
-            /**
-             * An array of strings or a Buffer naming possible NPN protocols.
-             * (Protocols should be ordered by their priority.)
-             */
-            NPNProtocols?: string[] | Buffer[] | Uint8Array[] | Buffer | Uint8Array,
-            /**
-             * An array of strings or a Buffer naming possible ALPN protocols.
-             * (Protocols should be ordered by their priority.) When the server
-             * receives both NPN and ALPN extensions from the client, ALPN takes
-             * precedence over NPN and the server does not send an NPN extension
-             * to the client.
-             */
-            ALPNProtocols?: string[] | Buffer[] | Uint8Array[] | Buffer | Uint8Array,
-            /**
-             * SNICallback(servername, cb) <Function> A function that will be
-             * called if the client supports SNI TLS extension. Two arguments
-             * will be passed when called: servername and cb. SNICallback should
-             * invoke cb(null, ctx), where ctx is a SecureContext instance.
-             * (tls.createSecureContext(...) can be used to get a proper
-             * SecureContext.) If SNICallback wasn't provided the default callback
-             * with high-level API will be used (see below).
-             */
-            SNICallback?: (servername: string, cb: (err: Error | null, ctx: SecureContext) => void) => void,
-            /**
-             * An optional Buffer instance containing a TLS session.
-             */
-            session?: Buffer,
-            /**
-             * If true, specifies that the OCSP status request extension will be
-             * added to the client hello and an 'OCSPResponse' event will be
-             * emitted on the socket before establishing a secure communication
-             */
-            requestOCSP?: boolean
-        });
+        secureContext?: SecureContext;
+        /**
+         * If true the TLS socket will be instantiated in server-mode.
+         * Defaults to false.
+         */
+        isServer?: boolean;
+        /**
+         * An optional net.Server instance.
+         */
+        server?: net.Server;
+        /**
+         * If true the server will request a certificate from clients that
+         * connect and attempt to verify that certificate. Defaults to
+         * false.
+         */
+        requestCert?: boolean;
+        /**
+         * If true the server will reject any connection which is not
+         * authorized with the list of supplied CAs. This option only has an
+         * effect if requestCert is true. Defaults to false.
+         */
+        rejectUnauthorized?: boolean;
+        /**
+         * An array of strings or a Buffer naming possible NPN protocols.
+         * (Protocols should be ordered by their priority.)
+         */
+        NPNProtocols?: string[] | Buffer[] | Uint8Array[] | Buffer | Uint8Array;
+        /**
+         * An array of strings or a Buffer naming possible ALPN protocols.
+         * (Protocols should be ordered by their priority.) When the server
+         * receives both NPN and ALPN extensions from the client; ALPN takes
+         * precedence over NPN and the server does not send an NPN extension
+         * to the client.
+         */
+        ALPNProtocols?: string[] | Buffer[] | Uint8Array[] | Buffer | Uint8Array;
+        /**
+         * SNICallback(servername, cb) <Function> A function that will be
+         * called if the client supports SNI TLS extension. Two arguments
+         * will be passed when called: servername and cb. SNICallback should
+         * invoke cb(null, ctx), where ctx is a SecureContext instance.
+         * (tls.createSecureContext(...) can be used to get a proper
+         * SecureContext.) If SNICallback wasn't provided the default callback
+         * with high-level API will be used (see below).
+         */
+        SNICallback?: (servername: string, cb: (err: Error | null, ctx: SecureContext) => void) => void;
+        /**
+         * An optional Buffer instance containing a TLS session.
+         */
+        session?: Buffer;
+        /**
+         * If true, specifies that the OCSP status request extension will be
+         * added to the client hello and an 'OCSPResponse' event will be
+         * emitted on the socket before establishing a secure communication
+         */
+        requestOCSP?: boolean;
+    }
 
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface TLSSocketEvents extends net.SocketEvents {
+        OCSPResponse: (response: Buffer) => void;
+        secureConnect: () => void;
+    }
+    // Actual parent is net.Socket
+    export class TLSSocketImpl extends events.TypedEventEmitterBase<TLSSocketEvents> {
         /**
          * A boolean that is true if the peer certificate was signed by one of the specified CAs, otherwise false.
          */
@@ -5531,36 +5169,11 @@ declare module "tls" {
          * @returns Returns true on success, false otherwise.
          */
         setMaxSendFragment(size: number): boolean;
-
-        /**
-         * events.EventEmitter
-         * 1. OCSPResponse
-         * 2. secureConnect
-         */
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "OCSPResponse", listener: (response: Buffer) => void): this;
-        addListener(event: "secureConnect", listener: () => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "OCSPResponse", response: Buffer): boolean;
-        emit(event: "secureConnect"): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "OCSPResponse", listener: (response: Buffer) => void): this;
-        on(event: "secureConnect", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "OCSPResponse", listener: (response: Buffer) => void): this;
-        once(event: "secureConnect", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "OCSPResponse", listener: (response: Buffer) => void): this;
-        prependListener(event: "secureConnect", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "OCSPResponse", listener: (response: Buffer) => void): this;
-        prependOnceListener(event: "secureConnect", listener: () => void): this;
     }
+    export type TLSSocket = TLSSocketImpl & net.Socket;
+    export const TLSSocket: {
+        new(socket: net.Socket, options?: TLSSocketOptions): TLSSocket,
+    } & events.EventEmitterStatic;
 
     export interface TlsOptions extends SecureContextOptions {
         handshakeTimeout?: number;
@@ -5589,63 +5202,25 @@ declare module "tls" {
         lookup?: net.LookupFunction;
     }
 
-    export class Server extends net.Server {
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface ServerEvents extends net.ServerEvents {
+        tlsClientError: (err: Error, tlsSocket: TLSSocket) => void;
+        newSession: (sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void) => void;
+        OCSPRequest: (certificate: Buffer, issuer: Buffer, callback: Function) => void;
+        resumeSession: (sessionId: any, callback: (err: Error, sessionData: any) => void) => void;
+        secureConnection: (tlsSocket: TLSSocket) => void;
+    }
+    export class ServerImpl extends events.TypedEventEmitterBase<ServerEvents> {
         addContext(hostName: string, credentials: {
             key: string;
             cert: string;
             ca: string;
         }): void;
-
-        /**
-         * events.EventEmitter
-         * 1. tlsClientError
-         * 2. newSession
-         * 3. OCSPRequest
-         * 4. resumeSession
-         * 5. secureConnection
-         */
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "tlsClientError", listener: (err: Error, tlsSocket: TLSSocket) => void): this;
-        addListener(event: "newSession", listener: (sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void) => void): this;
-        addListener(event: "OCSPRequest", listener: (certificate: Buffer, issuer: Buffer, callback: Function) => void): this;
-        addListener(event: "resumeSession", listener: (sessionId: any, callback: (err: Error, sessionData: any) => void) => void): this;
-        addListener(event: "secureConnection", listener: (tlsSocket: TLSSocket) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "tlsClientError", err: Error, tlsSocket: TLSSocket): boolean;
-        emit(event: "newSession", sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void): boolean;
-        emit(event: "OCSPRequest", certificate: Buffer, issuer: Buffer, callback: Function): boolean;
-        emit(event: "resumeSession", sessionId: any, callback: (err: Error, sessionData: any) => void): boolean;
-        emit(event: "secureConnection", tlsSocket: TLSSocket): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "tlsClientError", listener: (err: Error, tlsSocket: TLSSocket) => void): this;
-        on(event: "newSession", listener: (sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void) => void): this;
-        on(event: "OCSPRequest", listener: (certificate: Buffer, issuer: Buffer, callback: Function) => void): this;
-        on(event: "resumeSession", listener: (sessionId: any, callback: (err: Error, sessionData: any) => void) => void): this;
-        on(event: "secureConnection", listener: (tlsSocket: TLSSocket) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "tlsClientError", listener: (err: Error, tlsSocket: TLSSocket) => void): this;
-        once(event: "newSession", listener: (sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void) => void): this;
-        once(event: "OCSPRequest", listener: (certificate: Buffer, issuer: Buffer, callback: Function) => void): this;
-        once(event: "resumeSession", listener: (sessionId: any, callback: (err: Error, sessionData: any) => void) => void): this;
-        once(event: "secureConnection", listener: (tlsSocket: TLSSocket) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "tlsClientError", listener: (err: Error, tlsSocket: TLSSocket) => void): this;
-        prependListener(event: "newSession", listener: (sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void) => void): this;
-        prependListener(event: "OCSPRequest", listener: (certificate: Buffer, issuer: Buffer, callback: Function) => void): this;
-        prependListener(event: "resumeSession", listener: (sessionId: any, callback: (err: Error, sessionData: any) => void) => void): this;
-        prependListener(event: "secureConnection", listener: (tlsSocket: TLSSocket) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "tlsClientError", listener: (err: Error, tlsSocket: TLSSocket) => void): this;
-        prependOnceListener(event: "newSession", listener: (sessionId: any, sessionData: any, callback: (err: Error, resp: Buffer) => void) => void): this;
-        prependOnceListener(event: "OCSPRequest", listener: (certificate: Buffer, issuer: Buffer, callback: Function) => void): this;
-        prependOnceListener(event: "resumeSession", listener: (sessionId: any, callback: (err: Error, sessionData: any) => void) => void): this;
-        prependOnceListener(event: "secureConnection", listener: (tlsSocket: TLSSocket) => void): this;
     }
+    export type Server = ServerImpl & net.Server;
+    export const Server: {
+        new(): Server,
+    } & events.EventEmitterStatic;
 
     export interface ClearTextStream extends stream.Duplex {
         authorized: boolean;
@@ -5891,11 +5466,20 @@ declare module "stream" {
             destroy?: (error?: Error) => any;
         }
 
-        export class Readable extends Stream implements NodeJS.ReadableStream {
+        // Parent (stream.Stream) has no events
+        export interface ReadableEvents {
+            close: () => void;
+            data: (chunk: Buffer | string) => void;
+            end: () => void;
+            error: (err: Error) => void;
+            readable: () => void;
+        }
+
+        // Actual parent is Stream
+        export class ReadableImpl extends events.TypedEventEmitterBase<ReadableEvents> {
             readable: boolean;
             readonly readableHighWaterMark: number;
             readonly readableLength: number;
-            constructor(opts?: ReadableOptions);
             _read(size: number): void;
             read(size?: number): any;
             setEncoding(encoding: string): this;
@@ -5909,59 +5493,13 @@ declare module "stream" {
             _destroy(err: Error, callback: Function): void;
             destroy(error?: Error): void;
 
-            /**
-             * Event emitter
-             * The defined events on documents including:
-             * 1. close
-             * 2. data
-             * 3. end
-             * 4. readable
-             * 5. error
-             */
-            addListener(event: "close", listener: () => void): this;
-            addListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-            addListener(event: "end", listener: () => void): this;
-            addListener(event: "error", listener: (err: Error) => void): this;
-            addListener(event: "readable", listener: () => void): this;
-
-            emit(event: "close"): boolean;
-            emit(event: "data", chunk: Buffer | string): boolean;
-            emit(event: "end"): boolean;
-            emit(event: "error", err: Error): boolean;
-            emit(event: "readable"): boolean;
-
-            on(event: "close", listener: () => void): this;
-            on(event: "data", listener: (chunk: Buffer | string) => void): this;
-            on(event: "end", listener: () => void): this;
-            on(event: "error", listener: (err: Error) => void): this;
-            on(event: "readable", listener: () => void): this;
-
-            once(event: "close", listener: () => void): this;
-            once(event: "data", listener: (chunk: Buffer | string) => void): this;
-            once(event: "end", listener: () => void): this;
-            once(event: "readable", listener: () => void): this;
-            once(event: "error", listener: (err: Error) => void): this;
-
-            prependListener(event: "close", listener: () => void): this;
-            prependListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-            prependListener(event: "end", listener: () => void): this;
-            prependListener(event: "readable", listener: () => void): this;
-            prependListener(event: "error", listener: (err: Error) => void): this;
-
-            prependOnceListener(event: "close", listener: () => void): this;
-            prependOnceListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-            prependOnceListener(event: "end", listener: () => void): this;
-            prependOnceListener(event: "readable", listener: () => void): this;
-            prependOnceListener(event: "error", listener: (err: Error) => void): this;
-
-            removeListener(event: "close", listener: () => void): this;
-            removeListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-            removeListener(event: "end", listener: () => void): this;
-            removeListener(event: "readable", listener: () => void): this;
-            removeListener(event: "error", listener: (err: Error) => void): this;
-
             [Symbol.asyncIterator](): AsyncIterableIterator<Buffer | string>;
         }
+
+        export type Readable = ReadableImpl & Stream;
+        export const Readable: {
+            new(opts?: ReadableOptions): Readable;
+        } & events.EventEmitterStatic;
 
         export interface WritableOptions {
             highWaterMark?: number;
@@ -5973,11 +5511,21 @@ declare module "stream" {
             final?: (callback: (error?: Error) => void) => void;
         }
 
-        export class Writable extends Stream implements NodeJS.WritableStream {
+        // Parent (stream.Stream) has no events
+        export interface WritableEvents {
+            close: () => void;
+            drain: () => void;
+            error: (err: Error) => void;
+            finish: () => void;
+            pipe: (src: Readable) => void;
+            unpipe: (src: Readable) => void;
+        }
+
+        // Actual parent is Stream
+        export class WritableImpl extends events.TypedEventEmitterBase<WritableEvents> {
             writable: boolean;
             readonly writableHighWaterMark: number;
             readonly writableLength: number;
-            constructor(opts?: WritableOptions);
             _write(chunk: any, encoding: string, callback: (err?: Error) => void): void;
             _writev?(chunks: Array<{ chunk: any, encoding: string }>, callback: (err?: Error) => void): void;
             _destroy(err: Error, callback: Function): void;
@@ -5991,66 +5539,12 @@ declare module "stream" {
             cork(): void;
             uncork(): void;
             destroy(error?: Error): void;
-
-            /**
-             * Event emitter
-             * The defined events on documents including:
-             * 1. close
-             * 2. drain
-             * 3. error
-             * 4. finish
-             * 5. pipe
-             * 6. unpipe
-             */
-            addListener(event: "close", listener: () => void): this;
-            addListener(event: "drain", listener: () => void): this;
-            addListener(event: "error", listener: (err: Error) => void): this;
-            addListener(event: "finish", listener: () => void): this;
-            addListener(event: "pipe", listener: (src: Readable) => void): this;
-            addListener(event: "unpipe", listener: (src: Readable) => void): this;
-
-            emit(event: "close"): boolean;
-            emit(event: "drain", chunk: Buffer | string): boolean;
-            emit(event: "error", err: Error): boolean;
-            emit(event: "finish"): boolean;
-            emit(event: "pipe", src: Readable): boolean;
-            emit(event: "unpipe", src: Readable): boolean;
-
-            on(event: "close", listener: () => void): this;
-            on(event: "drain", listener: () => void): this;
-            on(event: "error", listener: (err: Error) => void): this;
-            on(event: "finish", listener: () => void): this;
-            on(event: "pipe", listener: (src: Readable) => void): this;
-            on(event: "unpipe", listener: (src: Readable) => void): this;
-
-            once(event: "close", listener: () => void): this;
-            once(event: "drain", listener: () => void): this;
-            once(event: "error", listener: (err: Error) => void): this;
-            once(event: "finish", listener: () => void): this;
-            once(event: "pipe", listener: (src: Readable) => void): this;
-            once(event: "unpipe", listener: (src: Readable) => void): this;
-
-            prependListener(event: "close", listener: () => void): this;
-            prependListener(event: "drain", listener: () => void): this;
-            prependListener(event: "error", listener: (err: Error) => void): this;
-            prependListener(event: "finish", listener: () => void): this;
-            prependListener(event: "pipe", listener: (src: Readable) => void): this;
-            prependListener(event: "unpipe", listener: (src: Readable) => void): this;
-
-            prependOnceListener(event: "close", listener: () => void): this;
-            prependOnceListener(event: "drain", listener: () => void): this;
-            prependOnceListener(event: "error", listener: (err: Error) => void): this;
-            prependOnceListener(event: "finish", listener: () => void): this;
-            prependOnceListener(event: "pipe", listener: (src: Readable) => void): this;
-            prependOnceListener(event: "unpipe", listener: (src: Readable) => void): this;
-
-            removeListener(event: "close", listener: () => void): this;
-            removeListener(event: "drain", listener: () => void): this;
-            removeListener(event: "error", listener: (err: Error) => void): this;
-            removeListener(event: "finish", listener: () => void): this;
-            removeListener(event: "pipe", listener: (src: Readable) => void): this;
-            removeListener(event: "unpipe", listener: (src: Readable) => void): this;
         }
+
+        export type Writable = WritableImpl & Stream;
+        export const Writable: {
+            new(opts?: WritableOptions): Writable;
+        } & events.EventEmitterStatic;
 
         export interface DuplexOptions extends ReadableOptions, WritableOptions {
             allowHalfOpen?: boolean;
@@ -6058,8 +5552,12 @@ declare module "stream" {
             writableObjectMode?: boolean;
         }
 
-        // Note: Duplex extends both Readable and Writable.
-        export class Duplex extends Readable implements Writable {
+        export interface DuplexEvents extends ReadableEvents, WritableEvents {
+            // Convenience interface for inheritors, no new events
+        }
+
+        // Per the docs, Duplex extends Readable, and also extends Writable parasitically.
+        export class DuplexImpl extends events.TypedEventEmitterBase<DuplexEvents> {
             writable: boolean;
             readonly writableHighWaterMark: number;
             readonly writableLength: number;
@@ -6077,6 +5575,11 @@ declare module "stream" {
             cork(): void;
             uncork(): void;
         }
+
+        export type Duplex = DuplexImpl & Readable & Writable;
+        export const Duplex: {
+            new(opts?: DuplexOptions): Duplex;
+        } & events.EventEmitterStatic;
 
         type TransformCallback = (err?: Error, data?: any) => void;
 
@@ -6861,7 +6364,23 @@ declare module "http2" {
         onError?: (err: NodeJS.ErrnoException) => void;
     }
 
-    export interface Http2Stream extends stream.Duplex {
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface Http2StreamEvents extends stream.DuplexEvents {
+        aborted: () => void;
+        close: () => void;
+        data: (chunk: Buffer | string) => void;
+        drain: () => void;
+        end: () => void;
+        error: (err: Error) => void;
+        finish: () => void;
+        frameError: (frameType: number, errorCode: number) => void;
+        pipe: (src: stream.Readable) => void;
+        unpipe: (src: stream.Readable) => void;
+        streamClosed: (code: number) => void;
+        timeout: () => void;
+        trailers: (trailers: IncomingHttpHeaders, flags: number) => void;
+    }
+    export interface Http2StreamImpl extends events.TypedEventEmitterBase<Http2StreamEvents> {
         readonly aborted: boolean;
         close(code: number, callback?: () => void): void;
         readonly closed: boolean;
@@ -6872,129 +6391,25 @@ declare module "http2" {
         readonly session: Http2Session;
         setTimeout(msecs: number, callback?: () => void): void;
         readonly state: StreamState;
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "aborted", listener: () => void): this;
-        addListener(event: "close", listener: () => void): this;
-        addListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-        addListener(event: "drain", listener: () => void): this;
-        addListener(event: "end", listener: () => void): this;
-        addListener(event: "error", listener: (err: Error) => void): this;
-        addListener(event: "finish", listener: () => void): this;
-        addListener(event: "frameError", listener: (frameType: number, errorCode: number) => void): this;
-        addListener(event: "pipe", listener: (src: stream.Readable) => void): this;
-        addListener(event: "unpipe", listener: (src: stream.Readable) => void): this;
-        addListener(event: "streamClosed", listener: (code: number) => void): this;
-        addListener(event: "timeout", listener: () => void): this;
-        addListener(event: "trailers", listener: (trailers: IncomingHttpHeaders, flags: number) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "aborted"): boolean;
-        emit(event: "close"): boolean;
-        emit(event: "data", chunk: Buffer | string): boolean;
-        emit(event: "drain"): boolean;
-        emit(event: "end"): boolean;
-        emit(event: "error", err: Error): boolean;
-        emit(event: "finish"): boolean;
-        emit(event: "frameError", frameType: number, errorCode: number): boolean;
-        emit(event: "pipe", src: stream.Readable): boolean;
-        emit(event: "unpipe", src: stream.Readable): boolean;
-        emit(event: "streamClosed", code: number): boolean;
-        emit(event: "timeout"): boolean;
-        emit(event: "trailers", trailers: IncomingHttpHeaders, flags: number): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "aborted", listener: () => void): this;
-        on(event: "close", listener: () => void): this;
-        on(event: "data", listener: (chunk: Buffer | string) => void): this;
-        on(event: "drain", listener: () => void): this;
-        on(event: "end", listener: () => void): this;
-        on(event: "error", listener: (err: Error) => void): this;
-        on(event: "finish", listener: () => void): this;
-        on(event: "frameError", listener: (frameType: number, errorCode: number) => void): this;
-        on(event: "pipe", listener: (src: stream.Readable) => void): this;
-        on(event: "unpipe", listener: (src: stream.Readable) => void): this;
-        on(event: "streamClosed", listener: (code: number) => void): this;
-        on(event: "timeout", listener: () => void): this;
-        on(event: "trailers", listener: (trailers: IncomingHttpHeaders, flags: number) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "aborted", listener: () => void): this;
-        once(event: "close", listener: () => void): this;
-        once(event: "data", listener: (chunk: Buffer | string) => void): this;
-        once(event: "drain", listener: () => void): this;
-        once(event: "end", listener: () => void): this;
-        once(event: "error", listener: (err: Error) => void): this;
-        once(event: "finish", listener: () => void): this;
-        once(event: "frameError", listener: (frameType: number, errorCode: number) => void): this;
-        once(event: "pipe", listener: (src: stream.Readable) => void): this;
-        once(event: "unpipe", listener: (src: stream.Readable) => void): this;
-        once(event: "streamClosed", listener: (code: number) => void): this;
-        once(event: "timeout", listener: () => void): this;
-        once(event: "trailers", listener: (trailers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "aborted", listener: () => void): this;
-        prependListener(event: "close", listener: () => void): this;
-        prependListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-        prependListener(event: "drain", listener: () => void): this;
-        prependListener(event: "end", listener: () => void): this;
-        prependListener(event: "error", listener: (err: Error) => void): this;
-        prependListener(event: "finish", listener: () => void): this;
-        prependListener(event: "frameError", listener: (frameType: number, errorCode: number) => void): this;
-        prependListener(event: "pipe", listener: (src: stream.Readable) => void): this;
-        prependListener(event: "unpipe", listener: (src: stream.Readable) => void): this;
-        prependListener(event: "streamClosed", listener: (code: number) => void): this;
-        prependListener(event: "timeout", listener: () => void): this;
-        prependListener(event: "trailers", listener: (trailers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "aborted", listener: () => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
-        prependOnceListener(event: "data", listener: (chunk: Buffer | string) => void): this;
-        prependOnceListener(event: "drain", listener: () => void): this;
-        prependOnceListener(event: "end", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (err: Error) => void): this;
-        prependOnceListener(event: "finish", listener: () => void): this;
-        prependOnceListener(event: "frameError", listener: (frameType: number, errorCode: number) => void): this;
-        prependOnceListener(event: "pipe", listener: (src: stream.Readable) => void): this;
-        prependOnceListener(event: "unpipe", listener: (src: stream.Readable) => void): this;
-        prependOnceListener(event: "streamClosed", listener: (code: number) => void): this;
-        prependOnceListener(event: "timeout", listener: () => void): this;
-        prependOnceListener(event: "trailers", listener: (trailers: IncomingHttpHeaders, flags: number) => void): this;
     }
+    export type Http2Stream = Http2StreamImpl & stream.Duplex;
+    export const Http2Stream: {
+        new(): Http2Stream,
+    } & events.EventEmitterStatic;
 
-    export interface ClientHttp2Stream extends Http2Stream {
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "headers", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        addListener(event: "push", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        addListener(event: "response", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "headers", headers: IncomingHttpHeaders, flags: number): boolean;
-        emit(event: "push", headers: IncomingHttpHeaders, flags: number): boolean;
-        emit(event: "response", headers: IncomingHttpHeaders, flags: number): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "headers", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        on(event: "push", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        on(event: "response", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "headers", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        once(event: "push", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        once(event: "response", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "headers", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependListener(event: "push", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependListener(event: "response", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "headers", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependOnceListener(event: "push", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependOnceListener(event: "response", listener: (headers: IncomingHttpHeaders, flags: number) => void): this;
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface ClientHttp2StreamEvents extends Http2StreamEvents {
+        headers: (headers: IncomingHttpHeaders, flags: number) => void;
+        push: (headers: IncomingHttpHeaders, flags: number) => void;
+        response: (headers: IncomingHttpHeaders, flags: number) => void;
     }
+    export interface ClientHttp2StreamImpl extends events.TypedEventEmitterBase<ClientHttp2StreamEvents> {
+        // No new properties
+    }
+    export type ClientHttp2Stream = ClientHttp2StreamImpl & Http2Stream;
+    export const ClientHttp2Stream: {
+        new(): ClientHttp2Stream,
+    } & events.EventEmitterStatic;
 
     export interface ServerHttp2Stream extends Http2Stream {
         additionalHeaders(headers: OutgoingHttpHeaders): void;
@@ -7038,7 +6453,17 @@ declare module "http2" {
         inflateDynamicTableSize?: number;
     }
 
-    export interface Http2Session extends events.EventEmitter {
+    export interface Http2SessionEvents {
+        close: () => void;
+        error: (err: Error) => void;
+        frameError: (frameType: number, errorCode: number, streamID: number) => void;
+        goaway: (errorCode: number, lastStreamID: number, opaqueData: Buffer) => void;
+        localSettings: (settings: Settings) => void;
+        remoteSettings: (settings: Settings) => void;
+        timeout: () => void;
+    }
+
+    export interface Http2SessionImpl extends events.TypedEventEmitterBase<Http2SessionEvents> {
         readonly alpnProtocol?: string;
         close(callback?: () => void): void;
         readonly closed: boolean;
@@ -7059,128 +6484,49 @@ declare module "http2" {
         settings(settings: Settings): void;
         readonly type: number;
         unref(): void;
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "close", listener: () => void): this;
-        addListener(event: "error", listener: (err: Error) => void): this;
-        addListener(event: "frameError", listener: (frameType: number, errorCode: number, streamID: number) => void): this;
-        addListener(event: "goaway", listener: (errorCode: number, lastStreamID: number, opaqueData: Buffer) => void): this;
-        addListener(event: "localSettings", listener: (settings: Settings) => void): this;
-        addListener(event: "remoteSettings", listener: (settings: Settings) => void): this;
-        addListener(event: "timeout", listener: () => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "close"): boolean;
-        emit(event: "error", err: Error): boolean;
-        emit(event: "frameError", frameType: number, errorCode: number, streamID: number): boolean;
-        emit(event: "goaway", errorCode: number, lastStreamID: number, opaqueData: Buffer): boolean;
-        emit(event: "localSettings", settings: Settings): boolean;
-        emit(event: "remoteSettings", settings: Settings): boolean;
-        emit(event: "timeout"): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "close", listener: () => void): this;
-        on(event: "error", listener: (err: Error) => void): this;
-        on(event: "frameError", listener: (frameType: number, errorCode: number, streamID: number) => void): this;
-        on(event: "goaway", listener: (errorCode: number, lastStreamID: number, opaqueData: Buffer) => void): this;
-        on(event: "localSettings", listener: (settings: Settings) => void): this;
-        on(event: "remoteSettings", listener: (settings: Settings) => void): this;
-        on(event: "timeout", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "close", listener: () => void): this;
-        once(event: "error", listener: (err: Error) => void): this;
-        once(event: "frameError", listener: (frameType: number, errorCode: number, streamID: number) => void): this;
-        once(event: "goaway", listener: (errorCode: number, lastStreamID: number, opaqueData: Buffer) => void): this;
-        once(event: "localSettings", listener: (settings: Settings) => void): this;
-        once(event: "remoteSettings", listener: (settings: Settings) => void): this;
-        once(event: "timeout", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "close", listener: () => void): this;
-        prependListener(event: "error", listener: (err: Error) => void): this;
-        prependListener(event: "frameError", listener: (frameType: number, errorCode: number, streamID: number) => void): this;
-        prependListener(event: "goaway", listener: (errorCode: number, lastStreamID: number, opaqueData: Buffer) => void): this;
-        prependListener(event: "localSettings", listener: (settings: Settings) => void): this;
-        prependListener(event: "remoteSettings", listener: (settings: Settings) => void): this;
-        prependListener(event: "timeout", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (err: Error) => void): this;
-        prependOnceListener(event: "frameError", listener: (frameType: number, errorCode: number, streamID: number) => void): this;
-        prependOnceListener(event: "goaway", listener: (errorCode: number, lastStreamID: number, opaqueData: Buffer) => void): this;
-        prependOnceListener(event: "localSettings", listener: (settings: Settings) => void): this;
-        prependOnceListener(event: "remoteSettings", listener: (settings: Settings) => void): this;
-        prependOnceListener(event: "timeout", listener: () => void): this;
     }
 
-    export interface ClientHttp2Session extends Http2Session {
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Http2Session = Http2SessionImpl & events.EventEmitter;
+    export const Http2Session: {
+        new(): Http2Session,
+    } & events.EventEmitterStatic;
+
+    export interface ClientHttp2SessionEvents extends Http2SessionEvents {
+        altsvc: (alt: string, origin: string, stream: number) => void;
+        connect: (session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket) => void;
+        stream: (stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void;
+    }
+
+    export interface ClientHttp2SessionImpl extends events.TypedEventEmitterBase<ClientHttp2SessionEvents> {
         request(headers?: OutgoingHttpHeaders, options?: ClientSessionRequestOptions): ClientHttp2Stream;
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "altsvc", listener: (alt: string, origin: string, stream: number) => void): this;
-        addListener(event: "connect", listener: (session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        addListener(event: "stream", listener: (stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "altsvc", alt: string, origin: string, stream: number): boolean;
-        emit(event: "connect", session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket): boolean;
-        emit(event: "stream", stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "altsvc", listener: (alt: string, origin: string, stream: number) => void): this;
-        on(event: "connect", listener: (session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        on(event: "stream", listener: (stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "altsvc", listener: (alt: string, origin: string, stream: number) => void): this;
-        once(event: "connect", listener: (session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        once(event: "stream", listener: (stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "altsvc", listener: (alt: string, origin: string, stream: number) => void): this;
-        prependListener(event: "connect", listener: (session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        prependListener(event: "stream", listener: (stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "altsvc", listener: (alt: string, origin: string, stream: number) => void): this;
-        prependOnceListener(event: "connect", listener: (session: ClientHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        prependOnceListener(event: "stream", listener: (stream: ClientHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
     }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type ClientHttp2Session = ClientHttp2SessionImpl & Http2Session;
+    export const ClientHttp2Session: {
+        new(): ClientHttp2Session,
+    } & events.EventEmitterStatic;
 
     export interface AlternativeServiceOptions {
         origin: number | string | url.URL;
     }
 
-    export interface ServerHttp2Session extends Http2Session {
-        altsvc(alt: string, originOrStream: number | string | url.URL | AlternativeServiceOptions): void;
-        readonly server: Http2Server | Http2SecureServer;
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "connect", listener: (session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        addListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "connect", session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket): boolean;
-        emit(event: "stream", stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "connect", listener: (session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        on(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "connect", listener: (session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        once(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "connect", listener: (session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        prependListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "connect", listener: (session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket) => void): this;
-        prependOnceListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
+    export interface ServerHttp2SessionEvents extends Http2SessionEvents {
+        connect: (session: ServerHttp2Session, socket: net.Socket | tls.TLSSocket) => void;
+        stream: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void;
     }
+
+    export interface ServerHttp2SessionImpl extends events.TypedEventEmitterBase<ServerHttp2SessionEvents> {
+        altsvc(alt: string, originOrStream: number | string | url.URL | AlternativeServiceOptions): void;
+        readonly server: Http2Server | Http2SecureServer;   // TODO: not in the docs?
+    }
+
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type ServerHttp2Session = ServerHttp2SessionImpl & Http2Session;
+    export const ServerHttp2Session: {
+        new(): ServerHttp2Session,
+    } & events.EventEmitterStatic;
 
     // Http2Server
 
@@ -7208,101 +6554,41 @@ declare module "http2" {
         allowHTTP1?: boolean;
     }
 
-    export interface Http2Server extends net.Server {
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        addListener(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        addListener(event: "sessionError", listener: (err: Error) => void): this;
-        addListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        addListener(event: "timeout", listener: () => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "checkContinue", request: Http2ServerRequest, response: Http2ServerResponse): boolean;
-        emit(event: "request", request: Http2ServerRequest, response: Http2ServerResponse): boolean;
-        emit(event: "sessionError", err: Error): boolean;
-        emit(event: "stream", stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number): boolean;
-        emit(event: "timeout"): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        on(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        on(event: "sessionError", listener: (err: Error) => void): this;
-        on(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        on(event: "timeout", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        once(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        once(event: "sessionError", listener: (err: Error) => void): this;
-        once(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        once(event: "timeout", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependListener(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependListener(event: "sessionError", listener: (err: Error) => void): this;
-        prependListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependListener(event: "timeout", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependOnceListener(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependOnceListener(event: "sessionError", listener: (err: Error) => void): this;
-        prependOnceListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependOnceListener(event: "timeout", listener: () => void): this;
+    export interface Http2ServerEvents extends net.ServerEvents {
+        checkContinue: (request: Http2ServerRequest, response: Http2ServerResponse) => void;
+        request: (request: Http2ServerRequest, response: Http2ServerResponse) => void;
+        sessionError: (err: Error) => void;
+        stream: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void;
+        timeout: () => void;
     }
 
-    export interface Http2SecureServer extends tls.Server {
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        addListener(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        addListener(event: "sessionError", listener: (err: Error) => void): this;
-        addListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        addListener(event: "timeout", listener: () => void): this;
-        addListener(event: "unknownProtocol", listener: (socket: tls.TLSSocket) => void): this;
+    export interface Http2ServerImpl extends events.TypedEventEmitterBase<Http2ServerEvents> {
+        // No new members
+    }
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Http2Server = Http2ServerImpl & net.Server;
+    export const Http2Server: {
+        new(): Http2Server,
+    } & events.EventEmitterStatic;
 
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "checkContinue", request: Http2ServerRequest, response: Http2ServerResponse): boolean;
-        emit(event: "request", request: Http2ServerRequest, response: Http2ServerResponse): boolean;
-        emit(event: "sessionError", err: Error): boolean;
-        emit(event: "stream", stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number): boolean;
-        emit(event: "timeout"): boolean;
-        emit(event: "unknownProtocol", socket: tls.TLSSocket): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        on(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        on(event: "sessionError", listener: (err: Error) => void): this;
-        on(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        on(event: "timeout", listener: () => void): this;
-        on(event: "unknownProtocol", listener: (socket: tls.TLSSocket) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        once(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        once(event: "sessionError", listener: (err: Error) => void): this;
-        once(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        once(event: "timeout", listener: () => void): this;
-        once(event: "unknownProtocol", listener: (socket: tls.TLSSocket) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependListener(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependListener(event: "sessionError", listener: (err: Error) => void): this;
-        prependListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependListener(event: "timeout", listener: () => void): this;
-        prependListener(event: "unknownProtocol", listener: (socket: tls.TLSSocket) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "checkContinue", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependOnceListener(event: "request", listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void): this;
-        prependOnceListener(event: "sessionError", listener: (err: Error) => void): this;
-        prependOnceListener(event: "stream", listener: (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, flags: number) => void): this;
-        prependOnceListener(event: "timeout", listener: () => void): this;
-        prependOnceListener(event: "unknownProtocol", listener: (socket: tls.TLSSocket) => void): this;
+    export interface Http2SecureServerEvents extends Http2ServerEvents {
+        unknownProtocol: (socket: tls.TLSSocket) => void;
     }
 
-    export interface Http2ServerRequest extends stream.Readable {
+    export interface Http2SecureServerImpl extends events.TypedEventEmitterBase<Http2SecureServerEvents> {
+        // No new members
+    }
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Http2SecureServer = Http2SecureServerImpl & tls.Server;
+    export const Http2SecureServer: {
+        new(): Http2SecureServer,
+    } & events.EventEmitterStatic;
+
+    export interface Http2ServerRequestEvents extends stream.ReadableEvents {
+        aborted: (hadError: boolean, code: number) => void;
+    }
+
+    export interface Http2ServerRequestImpl extends events.TypedEventEmitterBase<Http2ServerRequestEvents> {
         headers: IncomingHttpHeaders;
         httpVersion: string;
         method: string;
@@ -7313,27 +6599,22 @@ declare module "http2" {
         stream: ServerHttp2Stream;
         trailers: IncomingHttpHeaders;
         url: string;
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "aborted", hadError: boolean, code: number): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
     }
+    // Need a type in the type namespace, plus a constructor in the value namespace
+    export type Http2ServerRequest = Http2ServerRequestImpl & stream.Readable;
+    export const Http2ServerRequest: {
+        new(): Http2ServerRequest,
+    } & events.EventEmitterStatic;
 
-    export interface Http2ServerResponse extends events.EventEmitter {
+    // Typed event emitter pattern, see EventTypes.d.ts
+    export interface Http2ServerResponseEvents {
+        aborted: (hadError: boolean, code: number) => void;
+        close: () => void;
+        drain: () => void;
+        error: (error: Error) => void;
+        finish: () => void;
+    }
+    export interface Http2ServerResponseImpl extends events.TypedEventEmitterBase<Http2ServerRequestEvents> {
         addTrailers(trailers: OutgoingHttpHeaders): void;
         connection: net.Socket | tls.TLSSocket;
         end(callback?: () => void): void;
@@ -7359,52 +6640,13 @@ declare module "http2" {
         writeHead(statusCode: number, headers?: OutgoingHttpHeaders): void;
         writeHead(statusCode: number, statusMessage?: string, headers?: OutgoingHttpHeaders): void;
         createPushResponse(headers: OutgoingHttpHeaders, callback: (err: Error | null, res: Http2ServerResponse) => void): void;
-
-        addListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        addListener(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-        addListener(event: "close", listener: () => void): this;
-        addListener(event: "drain", listener: () => void): this;
-        addListener(event: "error", listener: (error: Error) => void): this;
-        addListener(event: "finish", listener: () => void): this;
-
-        emit(event: string | symbol, ...args: any[]): boolean;
-        emit(event: "aborted", hadError: boolean, code: number): boolean;
-        emit(event: "close"): boolean;
-        emit(event: "drain"): boolean;
-        emit(event: "error", error: Error): boolean;
-        emit(event: "finish"): boolean;
-
-        on(event: string | symbol, listener: (...args: any[]) => void): this;
-        on(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-        on(event: "close", listener: () => void): this;
-        on(event: "drain", listener: () => void): this;
-        on(event: "error", listener: (error: Error) => void): this;
-        on(event: "finish", listener: () => void): this;
-
-        once(event: string | symbol, listener: (...args: any[]) => void): this;
-        once(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-        once(event: "close", listener: () => void): this;
-        once(event: "drain", listener: () => void): this;
-        once(event: "error", listener: (error: Error) => void): this;
-        once(event: "finish", listener: () => void): this;
-
-        prependListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependListener(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-        prependListener(event: "close", listener: () => void): this;
-        prependListener(event: "drain", listener: () => void): this;
-        prependListener(event: "error", listener: (error: Error) => void): this;
-        prependListener(event: "finish", listener: () => void): this;
-
-        prependOnceListener(event: string | symbol, listener: (...args: any[]) => void): this;
-        prependOnceListener(event: "aborted", listener: (hadError: boolean, code: number) => void): this;
-        prependOnceListener(event: "close", listener: () => void): this;
-        prependOnceListener(event: "drain", listener: () => void): this;
-        prependOnceListener(event: "error", listener: (error: Error) => void): this;
-        prependOnceListener(event: "finish", listener: () => void): this;
     }
+    export type Http2ServerResponse = Http2ServerResponseImpl & events.EventEmitter;
+    export const Http2ServerResponse: {
+        new(): Http2ServerResponse,
+    } & events.EventEmitterStatic;
 
     // Public API
-
     export namespace constants {
         export const NGHTTP2_SESSION_SERVER: number;
         export const NGHTTP2_SESSION_CLIENT: number;
