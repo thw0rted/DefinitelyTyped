@@ -2718,7 +2718,7 @@ namespace net_tests {
     }
 
     {
-        let server = net.createServer();
+        let server: net.Server = net.createServer();
         // Check methods which return server instances by chaining calls
         server = server.listen(0)
             .close()
@@ -2734,6 +2734,8 @@ namespace net_tests {
         address.port = 1234;
         address.family = "ipv4";
         address.address = "127.0.0.1";
+
+        let count: number = net.Server.listenerCount(server, "close");
     }
 
     {
